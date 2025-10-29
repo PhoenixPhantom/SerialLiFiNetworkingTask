@@ -58,22 +58,15 @@ interactive_mode :: proc(listener: Listener) {
 				send_command(listener.device, .Send_Message, "helloooo :)", cast(byte)0xFF)
 			case:
 				warn("'%s' is not a valid commmand.\n", readbuf[:n_read - 1])
-				fallthrough
-			case 'h':
 				respond(
-					`Try one of:
-         p: print version
-         r: reset device
-         c[group, parameter, value]: set value of parameter from group
-         a: read device address
-         a[addr_in_hex]: set device address (8-bits)
-         m[message, target_addr]: send message to the target address (FF for brodcast)
-         q/e: exit interactive mode
-
-You can find more details described in the documentation:
-   https://gitlab.ethz.ch/wireless/WirelessNetworkingAndMobileComputing/-/wikis/home/Assignment-05/VlcSerial
-
-Use 'q' or 'e' to exit interactive mode.
+					`Try one of
+               p: print version
+               r: reset device
+               c[group, parameter, value]: set value of parameter from group
+               a: read device addres
+               a[addr_in_hex]: set device addres (8-bits)  or 'm' as described in the documentation:
+https://gitlab.ethz.ch/wireless/WirelessNetworkingAndMobileComputing/-/wikis/home/Assignment-05/VlcSerial
+Alternatively, enter 'q' or 'e' to exit interactive mode.
 `,
 				)
 				fmt.print("# ")
