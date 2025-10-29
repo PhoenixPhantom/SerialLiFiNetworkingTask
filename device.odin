@@ -51,8 +51,9 @@ connect_device :: proc(name: string) -> (device: Serial_Device, ok: bool) {
 	settings.cc[.VTIME] = 0
 	linux.ioctl(device, TCSETS2(), cast(uintptr)&settings)
 
-	fmt.println("[INFO] Baudrate set.")
+	fmt.println("[INFO] Setting parameters... (please wait)")
 	time.sleep(time.Second * 2)
+	fmt.println("[INFO] Parameters set.")
 
 	return device, true
 }
@@ -167,9 +168,9 @@ send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any
 		command_string = fmt.bprintf(
 			command_buffer[:],
 			"c[%v,%v,%v]\n",
-			args[0].(int),
-			args[1].(int),
-			args[2].(int),
+			args[0].(byte),
+			args[1].(byte),
+			args[2].(byte),
 		)
 	case .Send_Message:
 		command_string = fmt.bprintf(
