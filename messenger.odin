@@ -40,7 +40,6 @@ interactive_mode :: proc(listener: Listener) {
 					continue eventloop
 				}
 				send_command(listener.device, .Configure, args[0], args[1], args[2])
-				continue eventloop
 			case 'a':
 				args := get_arguments(readbuf[1:n_read])
 				defer delete(args)
@@ -58,9 +57,9 @@ interactive_mode :: proc(listener: Listener) {
 			case 'm':
 				send_command(listener.device, .Send_Message, "helloooo :)", cast(byte)0xFF)
 			case:
-				warn(
-					"'%s' is not a valid commmand.\n(try one of 'p', 'r', 'a' or 'm' or enter 'q'/'e' to exit interactive mode)\n",
-					readbuf[:n_read - 1],
+				warn("'%s' is not a valid commmand.\n", readbuf[:n_read - 1])
+				respond(
+					"Try one of 'p', 'r', 'c', 'a' or 'm' or enter 'q'/'e' to exit interactive mode.\n",
 				)
 				fmt.print("# ")
 				continue eventloop
@@ -73,7 +72,7 @@ interactive_mode :: proc(listener: Listener) {
 				defer delete(received)
 
 				if ok {
-					info("Received a message from device: %v\n", received)
+					respond("Received a message from device: %v\n", received)
 					any_received = true
 				}
 			}
