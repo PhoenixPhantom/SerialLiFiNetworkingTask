@@ -14,6 +14,15 @@ info :: proc(msg: string, args: ..any) -> int {
 	return fmt.printf(message, ..args)
 }
 
+respond :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;94m"
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s", COLOR, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+}
+
 warn :: proc(msg: string, args: ..any) -> int {
 	COLOR :: "\033[0;33m"
 	TYPE :: "[WARNING] "
