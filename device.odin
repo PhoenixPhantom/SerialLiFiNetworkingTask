@@ -16,14 +16,14 @@ connect_device :: proc(name: string) -> (device: Serial_Device, ok: bool) {
 	defer delete(device_name)
 	device, err = linux.open(device_name, {.RDWR, .NOCTTY, .NONBLOCK})
 	if err != nil {
-		fmt.println("[ERROR] Cannot conntect to device. Encountered: ", err)
+		error("Cannot conntect to device. Encountered: %v\n", err)
 		return
 	}
 	assert(0x802C542A == TCGETS2())
 	assert(0x402C542B == TCSETS2())
 
-	fmt.println("[INFO] Device found.")
-	fmt.println("[INFO] Setting baudrate...")
+	info("Device found.\n")
+	info("Setting baudrate...\n")
 	settings: Termios2
 	linux.ioctl(device, TCGETS2(), cast(uintptr)&settings)
 	settings.lflag &~= {.ICANON, .ECHO, .ECHOE, .ECHOK, .ECHONL, .ISIG, .IEXTEN}
@@ -51,9 +51,9 @@ connect_device :: proc(name: string) -> (device: Serial_Device, ok: bool) {
 	settings.cc[.VTIME] = 0
 	linux.ioctl(device, TCSETS2(), cast(uintptr)&settings)
 
-	fmt.println("[INFO] Setting parameters... (please wait)")
+	info("Setting parameters... (please wait)\n")
 	time.sleep(time.Second * 2)
-	fmt.println("[INFO] Parameters set.")
+	info("Parameters set.\n")
 
 	return device, true
 }
@@ -146,7 +146,7 @@ receive_serial :: proc(device: Serial_Device, channel: chan.Chan(string, .Send))
 		if err != nil && err != .EAGAIN {
 			fmt.print(err)
 			if err != nil {
-				fmt.println("[WARNING] Couldn't read from serial connection: ", err)
+				warn("Couldn't read from serial connection: %v\n", err)
 				delete(found)
 			}
 		}
@@ -184,14 +184,9 @@ send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any
 	}
 	n_written, err := linux.write(device, transmute([]u8)command_string)
 	if err != nil {
-		fmt.println(
-			"[ERROR] Cannot send command. Encountered:  (after writing %v bytes)",
-			err,
-			n_written,
-		)
+		error("Cannot send command. Encountered:  (after writing %v bytes) %v\n", err, n_written)
 		return false
 	}
-	//fmt.printfln("[INFO] Command '%s' sent (%v bytes)", command_string, n_written)
 	time.sleep(time.Millisecond * 100)
 	return true
 }

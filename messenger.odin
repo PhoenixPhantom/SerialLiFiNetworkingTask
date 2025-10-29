@@ -5,7 +5,6 @@ import "core:os/os2"
 import "core:strings"
 import "core:unicode"
 
-
 main :: proc() {
 	device, ok := connect_device("/dev/ttyACM0")
 	assert(ok)
@@ -33,8 +32,8 @@ interactive_mode :: proc(listener: Listener) {
 				args := get_arguments(readbuf[1:n_read])
 				defer delete(args)
 				if len(args) != 3 {
-					fmt.printfln(
-						"[ERROR] Cannot call c (configure) with arguments %v. The correct format is c[group, parameter, value]",
+					error(
+						"Cannot call c (configure) with arguments %v. The correct format is c[group, parameter, value]\n",
 						args,
 					)
 					fmt.print("# ")
@@ -46,8 +45,8 @@ interactive_mode :: proc(listener: Listener) {
 				args := get_arguments(readbuf[1:n_read])
 				defer delete(args)
 				if len(args) > 1 {
-					fmt.printfln(
-						"[ERROR] Cannot call a (set/get address) with arguments %v. The correct format is a[addr] or simply 'a'",
+					error(
+						"Cannot call a (set/get address) with arguments %v. The correct format is a[addr] or simply 'a'\n",
 						args,
 					)
 					fmt.print("# ")
@@ -59,8 +58,8 @@ interactive_mode :: proc(listener: Listener) {
 			case 'm':
 				send_command(listener.device, .Send_Message, "helloooo :)", cast(byte)0xFF)
 			case:
-				fmt.printfln(
-					"[WARNING] '%s' is not a valid commmand.\n(try one of 'p', 'r', 'a' or 'm' or enter 'q'/'e' to exit interactive mode)",
+				warn(
+					"'%s' is not a valid commmand.\n(try one of 'p', 'r', 'a' or 'm' or enter 'q'/'e' to exit interactive mode)\n",
 					readbuf[:n_read - 1],
 				)
 				fmt.print("# ")
@@ -74,12 +73,12 @@ interactive_mode :: proc(listener: Listener) {
 				defer delete(received)
 
 				if ok {
-					fmt.println("[MESSAGE] Received a message from device: ", received)
+					info("Received a message from device: %v\n", received)
 					any_received = true
 				}
 			}
 			if !any_received {
-				fmt.println("[ERROR] Could not receive from device. (serial connection timed out)")
+				error("Could not receive from device. (serial connection timed out)\n")
 			}
 			fmt.print("# ")
 		}
