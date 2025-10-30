@@ -68,7 +68,7 @@ Listener :: struct {
 listen_to_device :: proc(device: Serial_Device) -> (listener: Listener) {
 	listener.device = device
 	err: runtime.Allocator_Error
-	listener.channel, err = chan.create(chan.Chan(string), 10, context.allocator)
+	listener.channel, err = chan.create(chan.Chan(string), 100, context.allocator)
 	assert(err == nil)
 	listener.thread = thread.create_and_start_with_poly_data2(
 		device,
@@ -199,4 +199,68 @@ send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any
 	}
 	time.sleep(time.Millisecond * 100)
 	return true
+}
+
+Stat_Eval :: struct {
+	mode:            enum {
+		Invalid,
+		Receive,
+		Transmit,
+	},
+	type:            enum {
+		Invalid,
+		PHY,
+		Done,
+	},
+	from, to:        u8,
+	payload_size:    u8,
+	full_size:       u8,
+	sequence_number: int,
+	CW_slot:         int,
+	CW_size:         int,
+	dispatch_time:   int,
+	time:            int,
+}
+
+parse_statistical :: proc(received: string) -> (eval: Stat_Eval) {
+	fields := strings.split(received, ",")
+	if len(fields) < 6 do return
+	switch fields[0] {
+	case "s[T":
+		eval.mode = .Transmit
+	case "s[R":
+		eval.mode = .Receive
+	}
+	if eval.mode == .Transmit && len(fields) < 9 do return
+
+	switch fields[1] {
+	case "D":
+		eval.type = .Done
+	case "P":
+		eval.type = .PHY
+	}
+
+	eval.from = get_hex(cast(rune)fields[2][0]) * 16 + get_hex(cast(rune)fields[2][1])
+	eval.to = get_hex(cast(rune)fields[2][4]) * 16 + get_hex(cast(rune)fields[2][5])
+
+	i := strings.index_rune(fields[3], '(')
+	if i < 1 do return
+	eval.payload_size = cast(u8)strconv.atoi(fields[3][:i])
+
+	j := strings.index_rune(fields[3], ')')
+	if j < i + 1 do return
+	eval.full_size = cast(u8)strconv.atoi(fields[3][i + 1:j])
+
+	eval.sequence_number = strconv.atoi(fields[4])
+
+	if eval.mode == .Transmit {
+		eval.CW_slot = strconv.atoi(fields[5])
+		eval.CW_size = strconv.atoi(fields[6])
+		eval.dispatch_time = strconv.atoi(fields[7])
+		eval.time = strconv.atoi(fields[8])
+	} else {
+		eval.time = strconv.atoi(fields[5])
+	}
+
+	return eval
 }
