@@ -1,5 +1,6 @@
 package main
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
 import "core:strings"
@@ -10,13 +11,13 @@ import "core:time"
 
 Serial_Device :: linux.Fd
 
-connect_device :: proc(name: string) -> (device: Serial_Device, ok: bool) {
+connect_device :: proc(name: string, log_failure := true) -> (device: Serial_Device, ok: bool) {
 	err: linux.Errno
 	device_name := strings.clone_to_cstring(name)
 	defer delete(device_name)
 	device, err = linux.open(device_name, {.RDWR, .NOCTTY, .NONBLOCK})
 	if err != nil {
-		error("Cannot conntect to device. Encountered: %v\n", err)
+		if log_failure do error("Cannot conntect to device. Encountered: %v\n", err)
 		return
 	}
 	assert(0x802C542A == TCGETS2())
@@ -121,26 +122,35 @@ receive_serial :: proc(device: Serial_Device, channel: chan.Chan(string, .Send))
 	input_buffer: [10]byte
 	found: [dynamic]u8
 
+	find_transmission_end :: proc(found: []u8, prior: u8 = 0) -> (i: int) {
+		prior := prior
+		for c in found {
+			i += 1
+			if (prior == 'r' || prior == ']') && c == '\n' do return i // \n always marks the end of a serial transmission
+			prior = c
+		}
+		return -1
+	}
+
 	for !chan.is_closed(channel) {
 		n_read, err := linux.read(device, input_buffer[:])
 		if n_read > 0 {
 			old_len := len(found)
 			append(&found, ..input_buffer[:n_read])
-			i := old_len + 1
-			last := found[old_len - 1] if old_len != 0 else 0
-			for c in found[old_len:] {
-				if c == ']' || (last == 'r' && c == '\n') do break // ']' always marks the end of a serial transmission
-				last = c
-				i += 1
-			}
+			for {
+				i :=
+					old_len +
+					find_transmission_end(
+						found[old_len:],
+						found[old_len - 1] if old_len != 0 else 0,
+					)
 
-			//fmt.printfln("%s", found)
-			if i <= len(found) {
-				start := 1 if found[0] == '\n' else 0
-				chan.send(channel, strings.clone_from_bytes(found[start:i]))
-				remove_range(&found, 0, i) // clear received
+				if i >= old_len {
+					chan.send(channel, strings.clone_from_bytes(found[:i]))
+					remove_range(&found, 0, i) // clear received
+					old_len = 0
+				} else do break
 			}
-
 		}
 
 		if err != nil && err != .EAGAIN {
@@ -155,7 +165,7 @@ receive_serial :: proc(device: Serial_Device, channel: chan.Chan(string, .Send))
 
 send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any) -> bool {
 	command_string: string
-	command_buffer: [100]byte
+	command_buffer: [512]byte
 	switch command {
 	case .Reset:
 		command_string = "r\n"
