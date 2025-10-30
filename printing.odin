@@ -4,6 +4,16 @@ import "core:fmt"
 
 COLOR_OFF :: "\033[0m"
 
+prompt :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;92m"
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s", COLOR, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+
+}
+
 info :: proc(msg: string, args: ..any) -> int {
 	COLOR :: "\033[0;90m"
 	TYPE :: "[INFO] "
