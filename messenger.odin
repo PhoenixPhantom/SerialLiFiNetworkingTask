@@ -15,10 +15,18 @@ main :: proc() {
 }
 
 interactive_mode :: proc(listener: Listener) {
-	readbuf: [10]byte
+	readbuf: [2048]byte
 	fmt.print("# ")
 	eventloop: for {
 		n_read, serr := os2.read(os2.stdin, readbuf[:])
+		if n_read == len(readbuf) {
+			warn(
+				"The sequence entered was detected to have at least %v characters. Messages exceeding %v bytes will be truncated.",
+				len(readbuf),
+				len(readbuf),
+			)
+			os2.flush(os2.stdin)
+		}
 		if serr == nil || n_read > 0 {
 			switch readbuf[0] {
 			case 'e', 'q':
@@ -33,7 +41,7 @@ interactive_mode :: proc(listener: Listener) {
 				defer delete(args)
 				if len(args) != 3 {
 					error(
-						"Cannot call c (configure) with arguments %v. The correct format is c[group, parameter, value]\n",
+						"Cannot call 'c' (configure) with arguments %v. The correct format is c[group, parameter, value]\n",
 						args,
 					)
 					fmt.print("# ")
@@ -45,7 +53,7 @@ interactive_mode :: proc(listener: Listener) {
 				defer delete(args)
 				if len(args) > 1 {
 					error(
-						"Cannot call a (set/get address) with arguments %v. The correct format is a[addr] or simply 'a'\n",
+						"Cannot call 'a' (set/get address) with arguments %v. The correct format is a[addr] or simply 'a'\n",
 						args,
 					)
 					fmt.print("# ")
@@ -55,7 +63,26 @@ interactive_mode :: proc(listener: Listener) {
 				if len(args) == 1 do send_command(listener.device, .Address, args[0])
 				else do send_command(listener.device, .Address)
 			case 'm':
-				send_command(listener.device, .Send_Message, "helloooo :)", cast(byte)0xFF)
+				args: [dynamic]u8
+				defer delete(args)
+				sep := -1
+				word := transmute([]byte)strings.trim_space(transmute(string)readbuf[1:n_read])
+				if len(word) > 1 && word[0] == '[' && word[len(word) - 1] == ']' {
+					sep = strings.index(transmute(string)word, "\\0")
+					if sep > 0 do args = get_arguments(word[3 + sep:], full = false)
+				}
+
+				if len(args) != 1 {
+					error(
+						"Cannot call 'm' (send message) with arguments message = '%s' and address = %v. The correct format is m[message\\0, address]\n",
+						word[1:sep] if sep >= 0 else word[:0],
+						args,
+					)
+					fmt.print("# ")
+					continue eventloop
+				}
+
+				send_command(listener.device, .Send_Message, transmute(string)word[1:sep], args[0])
 			case:
 				warn("'%s' is not a valid commmand.\n", readbuf[:n_read - 1])
 				fallthrough
@@ -67,7 +94,7 @@ interactive_mode :: proc(listener: Listener) {
          c[group, parameter, value]: set value of parameter from group
          a: read device address
          a[addr_in_hex]: set device address (8-bits)
-         m[message, target_addr]: send message to the target address (FF for brodcast)
+         m[message\0, target_addr]: send the message (without the \0 separator) to the target address (FF for brodcast)
          q/e: exit interactive mode
 
 You can find more details described in the documentation:
@@ -99,18 +126,19 @@ Use 'q' or 'e' to exit interactive mode.
 	}
 }
 
-get_arguments :: proc(word: []byte) -> (args: [dynamic]u8) {
+get_arguments :: proc(word: []byte, full := true) -> (args: [dynamic]u8) {
 	word := word
-	word = transmute([]byte)strings.trim_space(transmute(string)word)
-	if len(word) > 1 && word[0] == '[' && word[len(word) - 1] == ']' {
-		val: u8 = 0
-		for c in word[1:] { 	// note this does not work for non-ascii characters, but you shouldn't enter those as arguments anyways
-			low_c := cast(u8)unicode.to_lower(cast(rune)c)
-			if c >= '0' && c <= '9' do val = val * 16 + (c - '0')
-			else if low_c >= 'a' && low_c <= 'f' do val = val * 16 + low_c - 'a' + 10
-			if c == ',' do append(&args, val)
-		}
-		append(&args, val)
+	if full {
+		word = transmute([]byte)strings.trim_space(transmute(string)word)
+		if len(word) < 2 || word[0] != '[' || word[len(word) - 1] != ']' do return
 	}
+	val: u8 = 0
+	for c in word[1 if full else 0:] { 	// note this does not work for non-ascii characters, but you shouldn't enter those as arguments anyways
+		low_c := cast(u8)unicode.to_lower(cast(rune)c)
+		if c >= '0' && c <= '9' do val = val * 16 + (c - '0')
+		else if low_c >= 'a' && low_c <= 'f' do val = val * 16 + low_c - 'a' + 10
+		if c == ',' do append(&args, val)
+	}
+	append(&args, val)
 	return
 }
