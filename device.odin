@@ -3,6 +3,7 @@ package main
 import "base:intrinsics"
 import "base:runtime"
 import "core:fmt"
+import "core:strconv"
 import "core:strings"
 import "core:sync/chan"
 import "core:sys/linux"
@@ -208,9 +209,11 @@ Stat_Eval :: struct {
 		Transmit,
 	},
 	type:            enum {
-		Invalid,
-		PHY,
-		Done,
+		Invalid = 0,
+		Data    = 0b01,
+		Ack     = 0b10,
+		Rts     = 0b100,
+		Cts_r   = 0b1000,
 	},
 	from, to:        u8,
 	payload_size:    u8,
@@ -233,11 +236,21 @@ parse_statistical :: proc(received: string) -> (eval: Stat_Eval) {
 	}
 	if eval.mode == .Transmit && len(fields) < 9 do return
 
-	switch fields[1] {
-	case "D":
-		eval.type = .Done
-	case "P":
-		eval.type = .PHY
+	switch fields[1][0] {
+	case 'D':
+		eval.type = .Data
+	case 'A':
+		eval.type = .Ack
+	case:
+		warn("Invalid field type: %v", fields[1])
+	}
+	if len(fields[1]) > 1 {
+		switch fields[1][1] {
+		case 'R':
+			eval.type |= .Rts
+		case 'C':
+			eval.type |= .Cts_r
+		}
 	}
 
 	eval.from = get_hex(cast(rune)fields[2][0]) * 16 + get_hex(cast(rune)fields[2][1])
