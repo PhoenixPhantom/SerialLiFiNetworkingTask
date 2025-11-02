@@ -76,6 +76,7 @@ listen_to_device :: proc(device: Serial_Device) -> (listener: Listener) {
 		chan.as_send(listener.channel),
 		receive_serial,
 		context,
+		priority = .High,
 	)
 	return listener
 }
@@ -92,7 +93,7 @@ wait_on_device :: proc(
 	start := now
 	ok: bool
 	assert(!chan.is_closed(listener.channel))
-	for time.diff(start, now) < timeout {
+	for time.diff(start, now) <= timeout {
 		response, ok = chan.try_recv(listener.channel)
 		if ok do return response, true
 		now = time.now()
@@ -198,7 +199,8 @@ send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any
 		error("Cannot send command. Encountered:  (after writing %v bytes) %v\n", err, n_written)
 		return false
 	}
-	time.sleep(time.Millisecond * 100)
+	if command == .Reset do time.sleep(time.Second * 2)
+	if command == .Configure do time.sleep(time.Millisecond * 100)
 	return true
 }
 
@@ -212,6 +214,10 @@ Stat_Eval :: struct {
 		Invalid = 0,
 		Data    = 0b01,
 		Ack     = 0b10,
+		DataRts = 0b101,
+		DataCts = 0b1001,
+		AckRts  = 0b110,
+		AckCts  = 0b1010,
 		Rts     = 0b100,
 		Cts_r   = 0b1000,
 	},
