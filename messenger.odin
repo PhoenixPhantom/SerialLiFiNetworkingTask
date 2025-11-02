@@ -11,11 +11,22 @@ main :: proc() {
 		prompt("\033[0;92m(messenger) \033[0m")
 	}
 
-
 	readbuf: [8192]byte
 	device := connect_to_device()
 	listener := listen_to_device(device)
 	defer disconnect_device(device, listener)
+
+	if len(os2.args) > 1 {
+		GENERATOR :: "load_generator"
+		RECEIVER :: "load_receiver"
+		if os2.args[1] == GENERATOR || (len(os2.args) > 2 && os2.args[2] == GENERATOR) {
+			load_generator(listener)
+			return
+		} else if os2.args[1] == RECEIVER || (len(os2.args) > 2 && os2.args[2] == RECEIVER) {
+			load_receiver(listener)
+			return
+		}
+	}
 
 
 	respond(
@@ -52,7 +63,7 @@ main :: proc() {
 	for {
 		received := false
 		for {
-			message := wait_on_device(listener, 1) or_break
+			message := wait_on_device(listener, 0) or_break
 			received = true
 			if message[0] == 's' {
 				eval := parse_statistical(message)
