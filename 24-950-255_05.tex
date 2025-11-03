@@ -1,0 +1,1534 @@
+\documentclass[12pt, a4paper]{scrartcl}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{wrapfig}
+\usepackage{listings}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[
+   backend=biber,
+   style=alphabetic,
+   sorting=ynt
+]{biblatex}
+\usepackage[english]{babel}
+\addbibresource{assignment05.bib}
+
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+ 
+\setlength\parindent{0pt}
+\setlength\parskip{12pt}
+
+\newcommand\invisiblesection[1]{%
+  \refstepcounter{section}%
+  \addcontentsline{toc}{section}{\protect\numberline{\thesection}#1}%
+  \sectionmark{#1}}
+\newcommand\invisiblesubsection[1]{%
+  \refstepcounter{subsection}%
+  \addcontentsline{toc}{subsection}{\protect\numberline{\thesubsection}#1}%
+  \subsectionmark{#1}}
+
+
+\title{%
+   Wireless Networking and Mobile Computing\\
+   \large Assignment 05}
+
+\author{Michel ???, Raffael Scagnetti\\
+\small???, 24-950-255}
+
+\date{November 2nd}
+
+\begin{document}
+\maketitle
+\invisiblesection{}
+\invisiblesection{}
+\section{Serial Interface}
+The code produced for this step was used as a basis for the chat application and the
+logic used for the performance evaluation, so for simplicity we simply refer to
+the appendix here, which contains the shared code for all subtasks.
+
+\section{Chat Application}
+\begin{wrapfigure}{L}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{Messenger.png}
+   \caption{The created messenger communicating with another instance over the
+   two arduinos}
+   \label{fig:messenger}
+\end{wrapfigure}
+
+Again, the source code for the Chat Application seen in
+\hyperref[fig:messenger]{Figure 1} can be found in the appendix.
+The chat application can be compiled with \verb|odin build . -out:messenger| and
+then started with \verb|./messenger| (without arguments). The application was
+written for Linux and makes use of Linux kernel headers (e.g. termios) to allow
+for relatively uncomplicated serial communication. This means that the code will
+\textit{not} work on MacOS or Windows. On WSL, the application may work but was
+not tested.
+
+\section{Performance Evaluation}
+\subsubsection*{Testing Setup}
+For the performance evaluation, the code was mostly the same as for the two
+previous steps. All the unique code can be found in the
+\verb|load_generator.odin| file. The tester can be started with
+\verb|./messenger load_generator| or \newline \verb|./messenger load_receiver|
+respectively.
+
+The tests were all made with a forward error correction value of 20 and
+a channel busy threshold of 10. For each scenario, the test was executed for
+payload sizes of 1, 100, 180 and 200 and ran for one minute each, followed by
+a listening period of at most 10s. The listening period should prevent the last
+ packages from incorrectly being shown as not delivered in the data and account
+for some of the delay over serial.
+
+After one payload size was tested, the device is first reset to ensure previous
+conditions do not affect the next test. To generate traffic, the load\_generator
+requests transmission of a random
+string of the given length. The string contains any characters between 32 and
+255 (in ASCII) and is chosen independently for each message. The characters that
+are not included in this test are ASCII control characters, as the controller
+seemed to become unresponsive when certain control characters were sent.
+
+The delay is measured for each packet and plotted in the graph at the time of
+the beginning of it's transmission. Delay is measured as the duration between
+the send command being issued and the reception of the acknowledgment frame on
+the original transmitter. This time is measured by the system clock of the
+system running the load\_generator. This choice
+of interval was made, as it represents the full time while the
+transmission was in flight. This interval should be relatively exact (particularly when
+compared to the Arduinos' built in clocks), meaning there is less random 
+noise in the measurements due to inconsistencies of the clock. Another reason is
+that the documentation available for the
+software on the Arduinos does not clearly state how and when exactly the time
+parameter provided in statistical evaluations are generated \cite{vlc-man}.
+Both of these problems are mitigated by measuring the delay as
+described above. The delay measured this way is the total round trip delay for
+the system. This includes the delay of one send and one receive operation over
+the serial connection. The measurement is thus representative of the delay that something
+like our messaging application would experience. However, it is not precisely
+the delay of the communication between the two Arduinos. If we assume that the
+serial connection is very fast compared to the rest of the system, as was
+indicated by initial experiments, this drawback is less significant.
+
+Throughput is calculated as the number and size of packets in transmission
+during an interval of 1ms. The contribution $c_{\text{thrp},p,I}$ of packet $p$
+of payload size $s_p$ to the interval $I$ during which it is transmitted then
+corresponds to $c_{\text{thrp},p,I} = \cfrac{s_p}{n(p)}$ where $n(p)$ is the
+number of intervals during which $p$ is transmitted. This type of measurement
+tries to eliminate arbitrary increases
+and decreases in throughput that occur if throughput is measured as an average
+over too short periods of time while not requiring more measured data for
+reasonable analysis of the data.
+
+Between two commands sent to the sender, a minimum time of 300ms is ensured.
+This is higher than the value provided in the documentation, as during
+pre-testing, for 10ms, 100ms and even 200ms, the controller consistently failed
+to respond to every second request sent. Using a minimum time of 300ms between
+two requests mostly fixed the problem. The high minimum time between
+transmissions however means that the throughput of small packets is
+significantly constrained in scenarios with a low number of retransmissions.
+
+During testing, it sometimes occurred that the device did not respond to serial
+communication. To prevent such faulty communications from halting
+the test, waiting for a response from the micro controller is limited to 5s. This
+should be enough time for the controller to respond regardless of the requested
+transmission size. The number of packets failed due to the 5s timeout are
+recorded for the evaluation but will only be mentioned if it is
+significant for understanding the result or otherwise particularly interesting.
+
+
+\begin{wrapfigure}{R}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{touching.png}
+   \caption{Data for transmissions with touching LEDs}
+   \label{fig:touching}
+\end{wrapfigure}
+\begin{wrapfigure}{L}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{5cm.png}
+   \caption{Data for transmissions with LEDs within 5cm}
+   \label{fig:5cm}
+\end{wrapfigure}
+\begin{wrapfigure}{R}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{10cm.png}
+   \caption{Data for transmissions with LEDs within 10cm}
+   \label{fig:10cm}
+\end{wrapfigure}
+\begin{wrapfigure}{L}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{15cm.png}
+   \caption{Data for transmissions with LEDs within 15cm}
+   \label{fig:15cm}
+\end{wrapfigure}
+\begin{wrapfigure}{R}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{20cm.png}
+   \caption{Data for transmissions with LEDs within 20cm}
+   \label{fig:20cm}
+\end{wrapfigure}
+\begin{wrapfigure}{L}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{25cm.png}
+   \caption{Data for transmissions with LEDs within 25cm}
+   \label{fig:25cm}
+\end{wrapfigure}
+\begin{wrapfigure}{R}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{29cm.png}
+   \caption{Data for transmissions with LEDs within 29cm}
+   \label{fig:29cm}
+\end{wrapfigure}
+\begin{wrapfigure}{L}{0.5\textwidth}
+   \centering
+   \includegraphics[width=0.5\textwidth]{31cm.png}
+   \caption{Data for transmissions with LEDs within 31cm}
+   \label{fig:31cm}
+\end{wrapfigure}
+
+\subsubsection*{Results}
+In \hyperref[fig:touching]{Figure 2}, we can see what
+the system is capable of in the test conditions explained above. As expected,
+we can see that no retransmissions are needed in this scenario. We can also
+observe that
+the throughput for one byte packages is significantly lower than for the other
+types of packages. In particular, 95\% of the
+throughput values for the 1s packet size were within the range $[0.0b/s, 4.9b/s]$,
+while the respective intervals for 100b, 180b and 200b payload sizes were
+$[87.6b/s, 124.5b/s]$, $[99.9b/s, 121.4b/s]$ and $[101.8b/s, 123.6b/s]$
+respectively. We also notice that the intervals for the higher payload sizes are
+not too different in terms of their upper limit. The lower limit of the
+intervals however increases with larger packet sizes as would be intuitively
+expected.
+
+Delay fully behaves as expected and strictly increases with increasing payload
+size. Particularly 95\% of the measured delays were within $[0.20s, 0.22s]$,
+$[0.80s, 1.13s]$, $[1.48s, 1.80s]$ and $[1.62s, 1.97s]$ for 1b, 100b, 180b and
+200b respective.
+
+
+Comparing \hyperref[fig:5cm]{Figure 3} with \hyperref[fig:touching]{Figure 2},
+we notice that they look remarkably similar. In particular, the upper and lower
+bounds of all the 95\% intervals of the throughputs differ by less than $1b/s$,
+which can reasonably be considered measurement error given that one minute of
+testing still produces relatively low sample sizes for high payload sizes.
+Similarly, the boundaries for the 95\% intervals of the delays differed by less
+than $0.005s$. This again can solely be attributed to measurement error and
+indicates that while within range, the performance VLC does not change
+significantly.
+
+We can see this trend continue for 10cm, 15cm and 20cm in
+\hyperref[fig:10cm]{Figure 4}, \hyperref[fig:15cm]{Figure 5},
+\hyperref[fig:20cm]{Figure 6} and \hyperref[fig:25cm]{Figure 7} where we can see
+almost no differences to \hyperref[fig:touching]{Figure 2}. The most deviating
+numbers are that for 15cm of distance with 180b payload size 95\% of
+the data was within $[1.44s, 1.79s]$ which is slightly lower than for the
+measurement in touching distance while the 100b payload had 95\% of it's delay
+within $[0.83s, 1.14s]$ which is slightly higher than the measurement within touching
+distance. Also, for 20cm of distance with the 200b payload size 95\% of the data
+was within $[1.60s, 1.97s]$ which was slightly lower than for no distance
+between the LEDs. The intervals for throughput showed no large
+differences even in these cases.
+
+All of these measurements agree with the hypothesis that the performance of VLC
+does not change significantly within range.
+
+We can now look at \hyperref[fig:29cm]{Figure 8} to see that the pattern of
+constant behavior does not continue indefinitely. The delay for the one byte
+payload now frequently reaches values over 0.5s and sometimes even goes as high
+as 5s. In particular, 95\% of the measurements for 1b payloads are now within
+$[0.21s, 1.12s]$ meaning that the upper bound increased significantly.
+Throughput is also affected with 95\% of the measurements between $[0.2b/s,
+4.6b/s]$. This means that while the lower bound has increased slightly, the
+upper bound has decreased significantly, meaning generally lower expected
+throughput. These spikes align roughly with serial communication errors caused
+by the controller not responding for at least 5s. This means that at least part
+of the lower performance number is not caused by the visual light communication.
+It is interesting however that serial communication failures only occurred at
+higher distances. This was conformed with repeated tests and suggests
+that despite being related to serial communication, the lower performance is
+caused by VLC or at least the tested implementation in some non-trivial way.
+
+For the other packet sizes, no overly long timeouts were detected.
+Still, the delay for the 100b payload showed significantly increased values (95\% of the measurements were within
+$[0.83s, 1.82s]$). Delays for the other two payloads remained relatively stable
+with 95\% of the measurements occurring within $[1.45s, 1.80s]$ and $[1.63s, 1.97s]$ 
+respectively. Adding to that, throughput also decreased for 100b and 180b
+payload sizes with 95\% of the measurements now occurring within $[36.0b/s,
+120.3b/s]$, $[53.9b/s, 124.0b/s]$. The throughput of the 200b payload remained
+relatively stable at $[101.8b/s, 123.0b/s]$. The increased numbers 
+indicate that the connection is less significantly stable at 29cm and that
+retransmissions are now frequently needed. Looking at the logs of the
+load\_generator agrees with this perspective despite the produced data (as
+displayed in the graphs) showing no retransmissions. This be due to a bug in the
+load\_generator causes to the Data RTS frames being identified incorrectly. Due
+to time constraints the testing could not repeated.
+
+Finally, we look at the results of the experiment at a 31cm LED to LED distance
+in \hyperref[fig:31cm]{Figure 9} and see that the communication between the two
+stations almost completely broken down. Points on the graph are only drawn for
+packets that could be delivered with relatively high certainty (i.e. received
+a corresponding ACK). Given this, we observe that only very few packets
+can be transmitted at this distance and only with massive delays. Particularly,
+95\% of the transmitted packages for the 1b payload had a delay within
+$0.96s, 13.69s]$. The other payload sizes also experienced high increases but
+less so with the intervals becoming $[1.21, 3.52s]$, $[1.82s, 5.50s]$
+and $[2.06s, 5.98s]$ respectively. It is clear here that VLC in this
+implementation with the settings described above cannot be relied upon at this
+distance and becomes dysfunctional.
+
+For completeness short tests were also done with, both lower and higher values
+of channel busy threshold and forward error correction. In the short tests
+performed, the impact of both was rather limited and did not restore reliably
+transfers. Still, using a channel busy threshold of 5 sometimes lead to slight
+improvements sometimes. Lower values of the busy threshold were also attempted
+but sometimes lead the micro controller to become unresponsive until a reset so
+they were not further pursued.
+
+\section*{Appendix}
+The following pages contain the code written in conjunction with this exercise.
+A more humanly readable version of the code than the listings in this document
+can also be found on GitHub \cite{product}.
+
+\subsubsection*{messenger.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+import "core:fmt"
+import "core:math"
+import "core:os/os2"
+import "core:strings"
+import "core:time"
+
+main :: proc() {
+	await_message :: proc() {
+		prompt("\033[0;92m(messenger) \033[0m")
+	}
+
+	readbuf: [8192]byte
+	device := connect_to_device()
+	listener := listen_to_device(device)
+	defer disconnect_device(device, listener)
+
+	if len(os2.args) > 1 {
+		GENERATOR :: "load_generator"
+		RECEIVER :: "load_receiver"
+		if os2.args[1] == GENERATOR || (len(os2.args) > 2 && os2.args[2] == GENERATOR) {
+			load_generator(listener)
+			return
+		} else if os2.args[1] == RECEIVER || (len(os2.args) > 2 && os2.args[2] == RECEIVER) {
+			load_receiver(listener)
+			return
+		}
+	}
+
+
+	respond(
+		`
+---------------------------------------------------------------
+|            Welcome to the Visual Light Messenger            |
+|                                                             |
+|                                                             |
+| You can write messages to others by writing your message    |
+| and pressing enter. To read the last (up to 100) unread     |
+| received messages, simply press enter without writing       |
+| anything.                                                   |
+|                                                             |
+| To send your messages to a specific target, enter  \to addr |
+| instead of a message with addr being your peer's            |
+| address and all your subsequent                             |
+| messages will only be sent there.                           |
+|                                                             |
+| To communicate with everyone, enter                \to all  |
+|                                                             |
+| To find your address to share with others, enter   \addr    |
+|                                                             |
+| To close the Visual Light Messenger, enter         \exit    |
+|                                                             |
+| And finally, you can access the lower-level                 |
+| settings of your VLC device by entering       \interactive  |
+---------------------------------------------------------------
+`,
+	)
+
+	target_address: u8 = 0xFF
+	n_failures := 0
+	await_message()
+	for {
+		received := false
+		for {
+			message := wait_on_device(listener, 0) or_break
+			received = true
+			if message[0] == 's' {
+				eval := parse_statistical(message)
+				info("Statistical evaluation: %#v\n", eval)
+			} else if !receive_message_serial(message) {
+				info("Received unknown tranmission type: %s\n", message)
+			}
+		}
+
+		if received do await_message()
+
+		n_read, serr := os2.read(os2.stdin, readbuf[:])
+		if n_read == len(readbuf) {
+			warn(
+				"Your message exceeds the current maximum message length of the Visual Light Messenger.\nMessages exceeding %v bytes will be truncated.\n",
+				len(readbuf),
+			)
+			os2.flush(os2.stdin)
+		}
+		if serr == nil || n_read > 0 {
+			message := strings.trim_space(transmute(string)readbuf[:n_read])
+			switch message {
+			case "\\addr":
+				send_command(listener.device, .Address)
+				received, success := wait_on_device(listener)
+				defer delete(received)
+
+				if success {
+					success =
+						len(received) == 5 &&
+						strings.has_prefix(received, "a[") &&
+						strings.has_suffix(received, "]")
+					if success {
+						addr := get_byte(received[2:])
+						respond("Your device has address: %2X\n", addr)
+						await_message()
+						continue
+					} else do fmt.print(received)
+				}
+
+				warn("Cannot get device address.\n")
+				await_message()
+			case "\\interactive":
+				interactive_mode(listener)
+				await_message()
+			case "\\exit":
+				respond("Closing...\n")
+				return
+			case:
+				if strings.has_prefix(message, "\\to ") {
+					message = strings.trim_space(message[4:])
+					if strings.contains(message, "all") {
+						target_address = 0xFF
+						info("Messages will now be sent to everyone\n")
+					} else if len(message) == 2 {
+						target_address = get_byte(message)
+						info("Messages will now be sent to %2X\n", target_address)
+					} else do warn("Cannot determine target address\n")
+					await_message()
+				} else {
+					send_full_message(listener, target_address, message, &n_failures)
+					await_message()
+				}
+			}
+		}
+	}
+	interactive_mode(listener)
+}
+
+interactive_mode :: proc(listener: Listener) {
+	readbuf: [2048]byte
+	fmt.print("# ")
+	eventloop: for {
+		n_read, serr := os2.read(os2.stdin, readbuf[:])
+		if n_read == len(readbuf) {
+			warn(
+				"The sequence entered was detected to have at least %v characters. Messages exceeding %v bytes will be truncated.\n",
+				len(readbuf),
+				len(readbuf),
+			)
+			os2.flush(os2.stdin)
+		}
+		if serr == nil || n_read > 0 {
+			switch readbuf[0] {
+			case 'e', 'q':
+				info("Exiting interactive mode...\n")
+				break eventloop
+			case 'p':
+				send_command(listener.device, .Version)
+			case 'r':
+				send_command(listener.device, .Reset)
+			case 'c':
+				args := get_arguments(readbuf[1:n_read])
+				defer delete(args)
+				if len(args) != 3 {
+					error(
+						"Cannot call 'c' (configure) with arguments %v. The correct format is c[group, parameter, value]\n",
+						args,
+					)
+					fmt.print("# ")
+					continue eventloop
+				}
+				send_command(listener.device, .Configure, args[0], args[1], args[2])
+			case 'a':
+				args := get_arguments(readbuf[1:n_read])
+				defer delete(args)
+				if len(args) > 1 {
+					error(
+						"Cannot call 'a' (set/get address) with arguments %v. The correct format is a[addr] or simply 'a'\n",
+						args,
+					)
+					fmt.print("# ")
+					continue eventloop
+				}
+
+				if len(args) == 1 do send_command(listener.device, .Address, args[0])
+				else do send_command(listener.device, .Address)
+			case 'm':
+				args: [dynamic]u8
+				defer delete(args)
+				sep := -1
+				word := transmute([]byte)strings.trim_space(transmute(string)readbuf[1:n_read])
+				if len(word) > 1 && word[0] == '[' && word[len(word) - 1] == ']' {
+					sep = strings.index(transmute(string)word, "\\0")
+					if sep > 0 do args = get_arguments(word[3 + sep:], full = false)
+				}
+
+				if len(args) != 1 {
+					error(
+						"Cannot call 'm' (send message) with arguments message = '%s' and address = %v. The correct format is m[message\\0, address]\n",
+						word[1:sep] if sep >= 0 else word[:0],
+						args,
+					)
+					fmt.print("# ")
+					continue eventloop
+				}
+
+				send_command(listener.device, .Send_Message, transmute(string)word[1:sep], args[0])
+			case:
+				warn("'%s' is not a valid commmand.\n", readbuf[:n_read - 1])
+				fallthrough
+			case 'h':
+				respond(
+					`Try one of:
+         p: print version
+         r: reset device
+         c[group, parameter, value]: set value of parameter from group
+         a: read device address
+         a[addr_in_hex]: set device address (8-bits)
+         m[message\0, target_addr]: send the message (without the \0 separator) to the target address (FF for brodcast)
+         q/e: exit interactive mode
+
+You can find more details described in the documentation:
+   https://gitlab.ethz.ch/wireless/WirelessNetworkingAndMobileComputing/-/wikis/home/Assignment-05/VlcSerial
+
+Use 'q' or 'e' to exit interactive mode.
+`,
+				)
+				fmt.print("# ")
+				continue eventloop
+			}
+			ok := true
+			any_received := false
+			received: string
+			for ok {
+				received, ok = wait_on_device(listener)
+				defer delete(received)
+
+				if ok {
+					respond("Received a message from device: %v\n", received)
+					any_received = true
+				}
+			}
+			if !any_received {
+				error("Could not receive from device. (serial connection timed out)\n")
+			}
+			fmt.print("# ")
+		}
+	}
+}
+
+connect_to_device :: proc() -> (device: Serial_Device) {
+	readbuf: [1024]byte
+	ok: bool
+	devicename: string = "ttyACM0"
+	if len(os2.args) > 1 {
+		devicename = os2.args[1]
+	}
+	for {
+		path: [1024]byte
+		devicename = strings.trim_space(devicename)
+		device_path := fmt.bprintf(path[:], "/dev/%s", devicename)
+
+		info("Attempting to connect to %s\n", device_path)
+		device, ok = connect_device(device_path, log_failure = false)
+		if ok do break
+
+		respond("Please enter the name of the device you want to connect to\n")
+		prompt("Device name: ")
+		n_read := os2.read(os2.stdin, readbuf[:]) or_continue
+		devicename = transmute(string)readbuf[:n_read]
+	}
+	return
+}
+
+send_full_message :: proc(
+	listener: Listener,
+	target_address: u8,
+	message: string,
+	n_failures: ^int,
+) {
+	message := message
+	message = strings.trim_space(message)
+	if len(message) > 0 {
+		info("Sending message...\n")
+		completed := true
+		MAX_MSG_SIZE :: 200
+		n := cast(int)math.ceil(cast(f32)len(transmute([]u8)message) / MAX_MSG_SIZE)
+		for i in 1 ..< n {
+			completed &= send_single_message(
+				listener,
+				target_address,
+				message[(i - 1) * MAX_MSG_SIZE:i * MAX_MSG_SIZE],
+			)
+		}
+		info("%v : %v\n", len(transmute([]u8)message), n)
+		completed &= send_single_message(
+			listener,
+			target_address,
+			message[(n - 1) * MAX_MSG_SIZE:],
+		)
+		if completed {
+			info("Message sent!\n")
+			n_failures^ = 0
+		} else {
+			error("Could not send message.\n")
+			n_failures^ += 1
+			if n_failures^ > 3 {
+				info("Something seems wrong with the device. Resetting...\n")
+				send_command(listener.device, .Reset)
+				resp := wait_on_device(listener)
+				delete(resp)
+				respond("The device was reset. Note that your address may have changed.\n")
+				n_failures^ = 0
+			}
+		}
+	}
+
+}
+
+send_single_message :: proc(listener: Listener, addr: u8, message: string) -> (completed: bool) {
+	info("Sending %s\n", message)
+	send_command(listener.device, .Send_Message, message, addr)
+	now := time.now()
+	start := now
+	for time.diff(start, now) < time.Second * 15 {
+		received := wait_on_device(listener, time.Second * 10) or_break
+		defer delete(received)
+		if len(received) < 4 do continue
+		if received[:4] == "m[T]" do info("Transmitting data...\n")
+		else if received[:4] == "m[D]" {
+			return true
+		} else if received[0] == 's' {
+			eval := parse_statistical(received)
+			info("Statistical evaluation: %#v\n", eval)
+		} else do receive_message_serial(received)
+		now = time.now()
+	}
+	return false
+}
+
+receive_message_serial :: proc(message: string) -> bool {
+	if message[:4] == "m[R," {
+		type: enum {
+			Invalid,
+			Data,
+			Ack,
+			Rts,
+			Cts,
+		}
+		switch message[4] {
+		case 'D':
+			type = .Data
+		case 'A':
+			type = .Ack
+		case 'R':
+			type = .Rts
+		case 'C':
+			type = .Cts
+		}
+		sent := message[6:len(message) - 2]
+		if type == .Data {
+			respond("\nReceived:\n______________\n%s\n______________\n", sent)
+		} else do info("Received transmission (%v): %s\n", type, sent)
+		return true
+	}
+	return false
+}
+\end{lstlisting}
+
+
+\subsubsection*{device.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+import "base:intrinsics"
+import "base:runtime"
+import "core:fmt"
+import "core:strconv"
+import "core:strings"
+import "core:sync/chan"
+import "core:sys/linux"
+import "core:thread"
+import "core:time"
+
+Serial_Device :: linux.Fd
+
+connect_device :: proc(name: string, log_failure := true) -> (device: Serial_Device, ok: bool) {
+	err: linux.Errno
+	device_name := strings.clone_to_cstring(name)
+	defer delete(device_name)
+	device, err = linux.open(device_name, {.RDWR, .NOCTTY, .NONBLOCK})
+	if err != nil {
+		if log_failure do error("Cannot conntect to device. Encountered: %v\n", err)
+		return
+	}
+	assert(0x802C542A == TCGETS2())
+	assert(0x402C542B == TCSETS2())
+
+	info("Device found.\n")
+	info("Setting baudrate...\n")
+	settings: Termios2
+	linux.ioctl(device, TCGETS2(), cast(uintptr)&settings)
+	settings.lflag &~= {.ICANON, .ECHO, .ECHOE, .ECHOK, .ECHONL, .ISIG, .IEXTEN}
+
+	settings.oflag &~= {.OPOST, .ONLCR, .OCRNL}
+
+	settings.iflag &~= {.INLCR, .IGNCR, .ICRNL, .IGNBRK}
+	settings.iflag &~= {.PARMRK, .INPCK, .ISTRIP} // setup parity
+	settings.iflag &~= {.IXON, .IXOFF, .IXANY} // no xonxoff
+
+	settings.cflag.baudrate = cast(u32)BRates_Extended.B115200
+	settings.cflag.extended_baudrate = true
+
+	settings.cflag.char_size = .Size8
+	settings.cflag.c_local = true
+	settings.cflag.c_read = true
+	settings.cflag.c_stopb = false
+
+	settings.cflag.parity_enable = false
+	settings.cflag.parity_odd = false
+	settings.cflag.cms_parity = false
+	settings.cflag.c_rtscts = false
+
+	settings.cc[.VMIN] = 0
+	settings.cc[.VTIME] = 0
+	linux.ioctl(device, TCSETS2(), cast(uintptr)&settings)
+
+	info("Setting parameters... (please wait)\n")
+	time.sleep(time.Second * 2)
+	info("Parameters set.\n")
+
+	return device, true
+}
+
+Listener :: struct {
+	device:  Serial_Device,
+	channel: chan.Chan(string),
+	thread:  ^thread.Thread,
+}
+
+listen_to_device :: proc(device: Serial_Device) -> (listener: Listener) {
+	listener.device = device
+	err: runtime.Allocator_Error
+	listener.channel, err = chan.create(chan.Chan(string), 100, context.allocator)
+	assert(err == nil)
+	listener.thread = thread.create_and_start_with_poly_data2(
+		device,
+		chan.as_send(listener.channel),
+		receive_serial,
+		context,
+		priority = .High,
+	)
+	return listener
+}
+
+@(require_results)
+wait_on_device :: proc(
+	listener: Listener,
+	timeout: time.Duration = time.Second,
+) -> (
+	response: string,
+	success: bool,
+) #optional_ok {
+	now := time.now()
+	start := now
+	ok: bool
+	assert(!chan.is_closed(listener.channel))
+	for time.diff(start, now) <= timeout {
+		response, ok = chan.try_recv(listener.channel)
+		if ok do return response, true
+		now = time.now()
+	}
+	return {}, false
+}
+
+disconnect_device :: proc(device: Serial_Device, listener: Listener = {}) -> linux.Errno {
+	if listener != {} {
+		assert(device == listener.device)
+		chan.close(listener.channel)
+		thread.join(listener.thread)
+		thread.destroy(listener.thread)
+	}
+	return linux.close(device)
+}
+
+Device_Command :: enum {
+	Reset,
+	Version,
+	Address,
+	Configure,
+	Send_Message,
+}
+
+@(private = "file")
+receive_serial :: proc(device: Serial_Device, channel: chan.Chan(string, .Send)) {
+	input_buffer: [10]byte
+	found: [dynamic]u8
+
+	find_transmission_end :: proc(found: []u8, prior: u8 = 0) -> (i: int) {
+		prior := prior
+		for c in found {
+			i += 1
+			if (prior == 'r' || prior == ']') && c == '\n' do return i // \n always marks the end of a serial transmission
+			prior = c
+		}
+		return -1
+	}
+
+	for !chan.is_closed(channel) {
+		n_read, err := linux.read(device, input_buffer[:])
+		if n_read > 0 {
+			old_len := len(found)
+			append(&found, ..input_buffer[:n_read])
+			for {
+				i :=
+					old_len +
+					find_transmission_end(
+						found[old_len:],
+						found[old_len - 1] if old_len != 0 else 0,
+					)
+
+				if i >= old_len {
+					chan.send(channel, strings.clone_from_bytes(found[:i]))
+					remove_range(&found, 0, i) // clear received
+					old_len = 0
+				} else do break
+			}
+		}
+
+		if err != nil && err != .EAGAIN {
+			fmt.print(err)
+			if err != nil {
+				warn("Couldn't read from serial connection: %v\n", err)
+				delete(found)
+			}
+		}
+	}
+}
+
+send_command :: proc(device: Serial_Device, command: Device_Command, args: ..any) -> bool {
+	command_string: string
+	command_buffer: [512]byte
+	switch command {
+	case .Reset:
+		command_string = "r\n"
+	case .Version:
+		command_string = "p\n"
+	case .Address:
+		if len(args) == 0 do command_string = "a\n"
+		else do command_string = fmt.bprintf(command_buffer[:], "a[%2X]\n", args[0].(byte))
+	case .Configure:
+		command_string = fmt.bprintf(
+			command_buffer[:],
+			"c[%v,%v,%v]\n",
+			args[0].(byte),
+			args[1].(byte),
+			args[2].(byte),
+		)
+	case .Send_Message:
+		command_string = fmt.bprintf(
+			command_buffer[:],
+			"m[%s%c,%2X]\n",
+			args[0].(string),
+			0,
+			args[1].(byte),
+		)
+
+	}
+	n_written, err := linux.write(device, transmute([]u8)command_string)
+	if err != nil {
+		error("Cannot send command. Encountered:  (after writing %v bytes) %v\n", err, n_written)
+		return false
+	}
+	if command == .Reset do time.sleep(time.Second * 2)
+	if command == .Configure do time.sleep(time.Millisecond * 100)
+	return true
+}
+
+Stat_Eval :: struct {
+	mode:            enum {
+		Invalid,
+		Receive,
+		Transmit,
+	},
+	type:            enum {
+		Invalid = 0,
+		Data    = 0b01,
+		Ack     = 0b10,
+		DataRts = 0b101,
+		DataCts = 0b1001,
+		AckRts  = 0b110,
+		AckCts  = 0b1010,
+		Rts     = 0b100,
+		Cts_r   = 0b1000,
+	},
+	from, to:        u8,
+	payload_size:    u8,
+	full_size:       u8,
+	sequence_number: int,
+	CW_slot:         int,
+	CW_size:         int,
+	dispatch_time:   int,
+	time:            int,
+}
+
+parse_statistical :: proc(received: string) -> (eval: Stat_Eval) {
+	fields := strings.split(received, ",")
+	if len(fields) < 6 do return
+	switch fields[0] {
+	case "s[T":
+		eval.mode = .Transmit
+	case "s[R":
+		eval.mode = .Receive
+	}
+	if eval.mode == .Transmit && len(fields) < 9 do return
+
+	switch fields[1][0] {
+	case 'D':
+		eval.type = .Data
+	case 'A':
+		eval.type = .Ack
+	case:
+		warn("Invalid field type: %v", fields[1])
+	}
+	if len(fields[1]) > 1 {
+		switch fields[1][1] {
+		case 'R':
+			eval.type |= .Rts
+		case 'C':
+			eval.type |= .Cts_r
+		}
+	}
+
+	eval.from = get_hex(cast(rune)fields[2][0]) * 16 + get_hex(cast(rune)fields[2][1])
+	eval.to = get_hex(cast(rune)fields[2][4]) * 16 + get_hex(cast(rune)fields[2][5])
+
+	i := strings.index_rune(fields[3], '(')
+	if i < 1 do return
+	eval.payload_size = cast(u8)strconv.atoi(fields[3][:i])
+
+	j := strings.index_rune(fields[3], ')')
+	if j < i + 1 do return
+	eval.full_size = cast(u8)strconv.atoi(fields[3][i + 1:j])
+
+	eval.sequence_number = strconv.atoi(fields[4])
+
+	if eval.mode == .Transmit {
+		eval.CW_slot = strconv.atoi(fields[5])
+		eval.CW_size = strconv.atoi(fields[6])
+		eval.dispatch_time = strconv.atoi(fields[7])
+		eval.time = strconv.atoi(fields[8])
+	} else {
+		eval.time = strconv.atoi(fields[5])
+	}
+
+	return eval
+}
+\end{lstlisting}
+
+\subsubsection*{device.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+import "core:strings"
+import "core:unicode"
+
+get_arguments :: proc(word: []byte, full := true) -> (args: [dynamic]u8) {
+	word := word
+	if full {
+		word = transmute([]byte)strings.trim_space(transmute(string)word)
+		if len(word) < 2 || word[0] != '[' || word[len(word) - 1] != ']' do return
+	}
+	val: u8 = 0
+	for c in word[1 if full else 0:] { 	// note this does not work for non-ascii characters, but you shouldn't enter those as arguments anyways
+		hex, is_hex := get_hex(cast(rune)c)
+		if is_hex do val = val * 16 + hex
+		else if c == ',' do append(&args, val)
+	}
+	append(&args, val)
+	return
+}
+
+get_byte :: proc(word: string) -> u8 {
+	return get_hex(cast(rune)word[0]) * 16 + get_hex(cast(rune)word[1])
+}
+
+get_hex :: proc(c: rune) -> (val: u8, is_hex: bool) #optional_ok {
+	c := c
+	c = unicode.to_lower(c)
+	if c >= '0' && c <= '9' do return u8(c - '0'), true
+	else if c >= 'a' && c <= 'f' do return u8(c - 'a' + 10), true
+	else do return 0, false
+}
+\end{lstlisting}
+\subsubsection*{termios.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+//import "core:sys/linux"
+
+IFlag :: enum {
+	IGNBRK  = 0, // Ignore break condition
+	BRKINT  = 1, // Signal interrupt on break
+	IGNPAR  = 2, // Ignore characters with parity errors
+	PARMRK  = 3, // Mark parity and framing errors
+	INPCK   = 4, // Enable input parity check
+	ISTRIP  = 5, // Strip 8th bit off characters
+	INLCR   = 6, // Map NL to CR on input
+	IGNCR   = 7, // Ignore CR
+	ICRNL   = 8, // Map CR to NL on input
+	IXANY   = 9, // Any character will restart after stop
+	IULC    = 10,
+	IXON    = 11,
+	IXOFF   = 13,
+	IMAXBEL = 14,
+	IUTF8   = 15,
+}
+IFlags :: distinct bit_set[IFlag;u32]
+
+OFlag :: enum {
+	OPOST  = 0,
+	OLCUC  = 1,
+	ONLCR  = 2,
+	OCRNL  = 3,
+	ONOCR  = 4,
+	ONLRET = 5,
+	OFILL  = 6,
+	OFDEL  = 7,
+	NLDLY  = 8,
+	NL1    = NLDLY,
+	CR1    = 9,
+	CR2    = 10,
+	TAB1   = 11,
+	BSDLY  = 13,
+	BS1    = BSDLY,
+	VTDLY  = 14,
+	VT1    = VTDLY,
+	FFDLY  = 15,
+	FF1    = FFDLY,
+}
+OFlags :: distinct bit_set[OFlag;u32]
+
+NL0 :: OFlag(0)
+CR0 :: NL0
+TAB0 :: NL0
+BS0 :: NL0
+VT0 :: NL0
+FF0 :: NL0
+
+CRDLY :: OFlag(0x0600)
+CR3 :: CRDLY
+TABDLY :: OFlag(0x01800)
+TAB3 :: TABDLY
+XTABS :: TABDLY
+
+BRates_Base :: enum u32 {
+	B0     = 0x0,
+	B50    = 0x1,
+	B75    = 0x2,
+	B110   = 0x3,
+	B134   = 0x4,
+	B150   = 0x5,
+	B200   = 0x6,
+	B300   = 0x7,
+	B600   = 0x8,
+	B1200  = 0x9,
+	B1800  = 0xa,
+	B2400  = 0xb,
+	B4800  = 0xc,
+	B9600  = 0xd,
+	B19200 = 0xe,
+	B38400 = 0xf,
+	EXTA   = B19200,
+	EXTB   = B38400,
+}
+
+BRates_Extended :: enum u32 {
+	B57600   = 0x1,
+	B115200  = 0x2,
+	B230400  = 0x3,
+	B460800  = 0x4,
+	B500000  = 0x5,
+	B576000  = 0x6,
+	B921000  = 0x7,
+	B1000000 = 0x8,
+	B1152000 = 0x9,
+	B1500000 = 0xa,
+	B2000000 = 0xb,
+	B2500000 = 0xc,
+	B3000000 = 0xd,
+	B3500000 = 0xe,
+	B4000000 = 0xf,
+}
+
+Char_Size :: enum u8 {
+	Size5    = 0,
+	Size6    = 0b1,
+	Size7    = 0b10,
+	Size8    = 0b11,
+	CharSize = Size8,
+}
+
+CIBaud :: enum u16 {
+	Disable = 0x0,
+	Enable  = 0x100f,
+}
+
+CFlags :: bit_field u32 {
+	baudrate:          u32       | 4, // interpret as BRates_Base/_Extended depending on extended_baudrate
+	char_size:         Char_Size | 2,
+	c_stopb:           bool      | 1,
+	c_read:            bool      | 1,
+	parity_enable:     bool      | 1, // PARENB
+	parity_odd:        bool      | 1,
+	hupcl:             bool      | 1,
+	c_local:           bool      | 1,
+	extended_baudrate: bool      | 1, // BOTHER or CBAUDEX
+	c_ibaud:           CIBaud    | 16,
+	addrb:             bool      | 1, // bit 29
+	cms_parity:        bool      | 1, // bit 30
+	c_rtscts:          bool      | 1, // bit 31
+}
+
+
+LFlag :: enum {
+	ISIG    = 0,
+	ICANON  = 1,
+	XCASE   = 2,
+	ECHO    = 3,
+	ECHOE   = 4,
+	ECHOK   = 5,
+	ECHONL  = 6,
+	NOFLSH  = 7,
+	TOSTOP  = 8,
+	ECHOCTL = 9,
+	ECHOPRT = 10,
+	ECHOKE  = 11,
+	FLUSHO  = 12,
+	PENDIN  = 13,
+	IEXTEN  = 14,
+	EXTPROC = 15,
+}
+LFlags :: distinct bit_set[LFlag;u32]
+
+
+NCCS :: 19
+Control_Characters :: enum u8 {
+	VINTR    = 0,
+	VQUIT    = 1,
+	VERASE   = 2,
+	VKILL    = 3,
+	VEOF     = 4,
+	VTIME    = 5,
+	VMIN     = 6,
+	VSWTC    = 7,
+	VSTART   = 8,
+	VSTOP    = 9,
+	VSUSP    = 10,
+	VEOL     = 11,
+	VREPRINT = 12,
+	VDISCARD = 13,
+	VWERASE  = 14,
+	VLNEXT   = 15,
+	VEOL2    = 16,
+	PADDING  = 17,
+	PADDING2 = 18,
+}
+#assert(len(Control_Characters) == NCCS)
+
+TC_Attr :: enum {
+	TCSANOW   = 0,
+	TCSADRAIN = 1,
+	TCSAFLUSH = 2,
+}
+
+Termios2 :: struct #packed {
+	iflag:  IFlags, // input mode flags
+	oflag:  OFlags, // ouput mode flags
+	cflag:  CFlags, // control mode flags
+	lflag:  LFlags, // local mode flags
+	line:   u8, // Line discipline
+	cc:     [Control_Characters]u8, // control characters
+	ispeed: u32, // input speed
+	ospeed: u32, // output speed
+}
+
+#assert(offset_of(Termios2, ispeed) / size_of(i32) == 9)
+#assert(size_of(Termios2) == 44)
+
+
+// "0x54 is just a magic number to make these relatively unique ('T')"
+// - ioctls.h
+TCGETS :: 0x5401
+TCSETS :: 0x5402
+
+@(private = "file")
+IOC :: proc "contextless" ($dir, $type, $nr, $size: u32) -> u32 {
+	_IOC_NRBITS :: 8
+	_IOC_TYPEBITS :: 8
+	_IOC_NRSHIFT :: 0
+	_IOC_SIZEBITS :: 14
+	_IOC_TYPESHIFT :: _IOC_NRSHIFT + _IOC_NRBITS
+	_IOC_SIZESHIFT :: _IOC_TYPESHIFT + _IOC_TYPEBITS
+	_IOC_DIRSHIFT :: _IOC_SIZESHIFT + _IOC_SIZEBITS
+
+	return(
+		(dir << _IOC_DIRSHIFT) |
+		(type << _IOC_TYPESHIFT) |
+		(nr << _IOC_NRSHIFT) |
+		(size << _IOC_SIZESHIFT) \
+	)
+}
+
+@(private = "file")
+IOR :: proc "contextless" ($type, $nr: u32, $argtype: typeid) -> u32 {
+	_IOC_READ :: 2
+	return IOC(_IOC_READ, type, nr, size_of(argtype))
+}
+
+@(private = "file")
+IOW :: proc "contextless" ($type, $nr: u32, $argtype: typeid) -> u32 {
+	_IOC_WRITE :: 1
+	return IOC(_IOC_WRITE, type, nr, size_of(argtype))
+}
+
+TCGETS2 :: proc() -> u32 {
+	return IOR('T', 0x2A, Termios2)
+}
+
+TCSETS2 :: proc() -> u32 {
+	return IOW('T', 0x2B, Termios2)
+}
+\end{lstlisting}
+
+\subsubsection*{printing.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+import "core:fmt"
+
+COLOR_OFF :: "\033[0m"
+
+prompt :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;92m"
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s", COLOR, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+
+}
+
+info :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;90m"
+	TYPE :: "[INFO] "
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF) + len(TYPE))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s%s", COLOR, TYPE, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+}
+
+respond :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;94m"
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s", COLOR, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+}
+
+warn :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;33m"
+	TYPE :: "[WARNING] "
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF) + len(TYPE))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s%s", COLOR, TYPE, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+}
+
+error :: proc(msg: string, args: ..any) -> int {
+	COLOR :: "\033[0;31m"
+	TYPE :: "[ERROR] "
+	buffer := make([]u8, len(msg) + len(COLOR) + len(COLOR_OFF) + len(TYPE))
+	defer delete(buffer)
+
+	message := fmt.bprintf(buffer, "%s%s%s%s", COLOR, TYPE, msg, COLOR_OFF)
+	return fmt.printf(message, ..args)
+}
+\end{lstlisting}
+
+\subsubsection*{load\_generator.odin}
+\begin{lstlisting}[breaklines=true]
+package main
+
+import "core:encoding/csv"
+import "core:fmt"
+import "core:math/rand"
+import "core:os/os2"
+import "core:strconv"
+import "core:strings"
+import "core:time"
+
+
+@(require_results)
+make_random_string :: proc(length: int) -> string {
+	source := make([]u8, length)
+	for &c in source do c = cast(u8)rand.int31_max(255 - ' ') + ' ' // ' ' is the first non-control
+	return transmute(string)source
+}
+
+prepare_test :: proc(listener: Listener) {
+	send_command(listener.device, .Configure, cast(u8)0, cast(u8)1, cast(u8)20)
+	response, success := wait_on_device(listener, time.Second * 10)
+	info("%s", response)
+	assert(success)
+	delete(response)
+
+	send_command(listener.device, .Configure, cast(u8)0, cast(u8)2, cast(u8)5)
+	response, success = wait_on_device(listener, time.Second * 10)
+	info("%s", response)
+	assert(success)
+	delete(response)
+}
+
+
+load_generator :: proc(listener: Listener) {
+	prepare_test(listener)
+
+	respond("Enter the address of the load receiver\n")
+	prompt("Target address: ")
+	file, err := os2.open("sender.csv", {.Write, .Trunc, .Create})
+	assert(err == nil)
+	defer os2.close(file)
+
+	data: csv.Writer
+	csv.writer_init(&data, os2.to_stream(file))
+	defer csv.writer_flush(&data)
+
+	inbuf: [3]u8
+	n_read, serr := os2.read(os2.stdin, inbuf[:])
+	assert(serr == nil)
+	address: u8
+	if n_read > 1 do address = get_byte(transmute(string)inbuf[:n_read])
+	info("Using address: %2X\n", address)
+
+	packet_sizes := [?]int{1, 100, 180, 200}
+
+	notebuf: [1024]u8
+	for {
+		respond("Enter experiment notes and press enter (enter 'quit' to quit)\n")
+		n_readnote := 0
+		oerr: os2.Error
+		for n_readnote <= 0 {
+			prompt("-> ")
+			n_readnote, oerr = os2.read(os2.stdin, notebuf[:])
+			assert(oerr == nil)
+		}
+		note := strings.clone(transmute(string)notebuf[:n_readnote - 1])
+		defer delete(note)
+		if note == "quit" do break
+
+		for packet_size in packet_sizes {
+			respond("Testing packet size %v\n", packet_size)
+			title := fmt.bprintf(notebuf[:], "%s (Packet size: %v)", note, packet_size)
+			csv.write(&data, {})
+			csv.write(&data, {title})
+			raw_package, raw_throughput, dropped := run_experiment(listener, address, packet_size)
+			info("Finished experiment.\n")
+			defer {
+				delete(raw_package)
+				delete(raw_throughput)
+			}
+			delays := make([]string, len(raw_package) + 1)
+			defer {
+				for delay in delays[1:] do delete(delay)
+				delete(delays)
+			}
+			times := make([]string, len(raw_package) + 1)
+			defer {
+				for time in times[1:] do delete(time)
+				delete(times)
+			}
+			retrans := make([]string, len(raw_package) + 1)
+			defer {
+				for retran in retrans[1:] do delete(retran)
+				delete(retrans)
+			}
+
+			throughputs := make([]string, len(raw_throughput) + 1)
+			defer {
+				for throughput in throughputs[1:] do delete(throughput)
+				delete(throughputs)
+			}
+			delays[0] = "Packet delay [ns]"
+			times[0] = "Transmission start [ns from first packet]"
+			retrans[0] = "Number of retransmissions [#]"
+			throughputs[0] = "Throughput [b/ms] (Average every 1s)"
+			for delay, i in raw_package {
+				if delay.delay == max(time.Duration) do delays[i + 1] = strings.clone("NaN")
+				else do delays[i + 1] = strings.clone(strconv.itoa(notebuf[:], cast(int)delay.delay))
+				retrans[i + 1] = strings.clone(strconv.itoa(notebuf[:], delay.retransmissions))
+				times[i + 1] = strings.clone(
+					strconv.itoa(notebuf[:], cast(int)time.diff(raw_package[0].sent, delay.sent)),
+				)
+			}
+			for tp, i in raw_throughput do throughputs[i + 1] = strings.clone(strconv.ftoa(notebuf[:], tp, 'f', 15, 64))
+			csv.write(&data, times)
+			csv.write(&data, delays)
+			csv.write(&data, retrans)
+			csv.write(&data, throughputs)
+			csv.write(
+				&data,
+				{"Packages dropped over serial [#]", strconv.itoa(notebuf[:], dropped)},
+			)
+
+			send_command(listener.device, .Reset)
+			response, ok := wait_on_device(listener, time.Second * 10)
+			info("%v\n", response)
+			assert(ok)
+			delete(response)
+			prepare_test(listener)
+		}
+		csv.write(&data, {})
+		respond("Experiment completed!\n")
+	}
+}
+
+Packet_Properties :: struct {
+	sent:            time.Time,
+	delay:           time.Duration,
+	retransmissions: int,
+}
+
+run_experiment :: proc(
+	listener: Listener,
+	address: u8,
+	length: int,
+) -> (
+	packet: [dynamic]Packet_Properties,
+	throughput: [dynamic]f64,
+	dropped: int,
+) {
+	experiment_start := time.now()
+	now := experiment_start
+	last_tp := now
+	bytes_sent: int
+	last_received: time.Time
+
+	for time.diff(experiment_start, now) < time.Minute {
+		payload := make_random_string(length)
+		info("Transmitting payload...\n")
+		send_command(listener.device, .Send_Message, payload, address)
+		append(&packet, Packet_Properties{time.now(), max(time.Duration), 0})
+		bytes_sent += length
+
+		do_continue := true
+		start := time.now()
+		last_received, now = start, start
+		// limit wait time for failing transmissions
+		// and wait at least 10ms to not overload the controller
+		// WARN: 10 ms as claimed in the task description (and for that matter even 100ms and 200ms (both tested)) still cause
+		// the controller to consistently miss every second request. 300ms
+		// works but sadly already starts limiting the 1byte package case when no retransmissions are needed
+		for (do_continue || time.diff(start, now) < time.Millisecond * 300) &&
+		    time.diff(last_received, now) < time.Second * 5 &&
+		    time.diff(experiment_start, now) < time.Minute {
+			if diff := time.diff(last_tp, now); diff >= time.Second {
+				append(&throughput, cast(f64)bytes_sent / cast(f64)(diff / time.Millisecond))
+				bytes_sent = 0
+				last_tp = now
+			}
+
+			now = time.now()
+			received := wait_on_device(listener, 0) or_continue
+			defer delete(received)
+
+			do_continue &= process_response(received, address, &packet)
+			now = time.now()
+			last_received = now
+		}
+		if do_continue do dropped += 1
+		info("Transmitted payload\n")
+	}
+
+	end := now
+	for time.diff(end, now) < time.Second * 10 &&
+	    packet[len(packet) - 1].delay != max(time.Duration) { 	// wait for late acks
+		now = time.now()
+		received := wait_on_device(listener, 0) or_continue
+		defer delete(received)
+		breaking := !process_response(received, address, &packet)
+		if breaking do dropped -= 1
+	}
+	return
+
+	process_response :: proc(
+		received: string,
+		address: u8,
+		packet: ^[dynamic]Packet_Properties,
+	) -> (
+		do_continue: bool,
+	) {
+		if len(received) < 4 do return true
+		else if received[:4] == "m[D]" do return false
+		else if received[0] == 's' {
+			eval := parse_statistical(received)
+			if (eval.type & .Rts) != .Invalid {
+				packet[eval.sequence_number].retransmissions += 1
+			}
+			if eval.type == .Data {
+				//info("%v vs %v", len(delays), eval.sequence_number)
+				info("Received data frame %#v", eval)
+				// assert(len(packet) == eval.sequence_number)
+				// append(packet, Packet_Properties{time.now(), max(time.Duration), 0})
+			} else if (eval.type == .Ack || eval.type & .Ack != .Invalid) && eval.from == address {
+				info("Received ack frame %#v", eval)
+				packet[eval.sequence_number].delay = time.diff(packet[eval.sequence_number].sent, time.now())
+			} else do info("Unknown evaluation type %v\n", eval.type)
+		}
+		return true
+	}
+}
+
+load_receiver :: proc(listener: Listener) {
+	prepare_test(listener)
+
+	send_command(listener.device, .Address)
+	addr, ok := wait_on_device(listener, time.Second + 10)
+	assert(ok)
+	respond("The receiver has address: %v\n", addr[2:len(addr) - 2])
+	for {
+		message := wait_on_device(listener, 0) or_continue
+		delete(message)
+	}
+}
+\end{lstlisting}
+
+
+
+\pagebreak
+\printbibliography
+\end{document}
