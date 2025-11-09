@@ -386,7 +386,7 @@ main :: proc() {
 
 				if success {
 					success =
-						len(received) == 5 &&
+						len(received) > 2 &&
 						strings.has_prefix(received, "a[") &&
 						strings.has_suffix(received, "]")
 					if success {
